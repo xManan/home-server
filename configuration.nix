@@ -1,5 +1,7 @@
 { config, lib, pkgs, ... }:
 let
+  unstable = import <nixos-unstable> {};
+
   protonVPNCreds = lib.splitString "\n" (builtins.readFile /home/manan/protonvpn/credentials.txt);
   protonVPNUsername = builtins.elemAt protonVPNCreds 0;
   protonVPNPassword = builtins.elemAt protonVPNCreds 1;
@@ -21,7 +23,11 @@ in
 
   i18n.defaultLocale = "en_US.UTF-8";
 
-  services.logind.lidSwitch = "ignore";
+  services.logind = {
+    lidSwitch = "ignore";
+    lidSwitchDocked = "ignore";
+    suspendKey = "ignore";
+  };
   
   services.openssh = {
     enable = true;
@@ -65,6 +71,7 @@ in
     jellyfin
     jellyfin-web
     jellyfin-ffmpeg
+    htop
   ];
 
   environment.shellAliases = {
@@ -155,6 +162,22 @@ in
   };
 
   environment.etc.openvpn.source = "${pkgs.update-resolv-conf}/libexec/openvpn";
+
+  nixpkgs.config.packageOverrides = pkgs: {
+    vaapiIntel = pkgs.vaapiIntel.override { enableHybridCodec = true; };
+  };
+  hardware.graphics = {
+    enable = true;
+    extraPackages = with pkgs; [
+      intel-media-driver
+      intel-vaapi-driver
+      vaapiVdpau
+      intel-compute-runtime
+      vpl-gpu-rt
+      intel-media-sdk
+      libvdpau-va-gl
+    ];
+  };
 
   system.stateVersion = "23.11";
 }
