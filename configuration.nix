@@ -5,6 +5,7 @@ let
   protonVPNCreds = lib.splitString "\n" (builtins.readFile /home/manan/protonvpn/credentials.txt);
   protonVPNUsername = builtins.elemAt protonVPNCreds 0;
   protonVPNPassword = builtins.elemAt protonVPNCreds 1;
+  pinggyToken = lib.trim (builtins.readFile /home/manan/pinggy/token.txt);
 in
 {
   imports =
@@ -58,7 +59,7 @@ in
 
   networking.firewall = {
     enable = true;
-    allowedTCPPorts = [ 80 443 8097 ];
+    allowedTCPPorts = [ 80 443 4300 ];
   };
 
   environment.systemPackages = with pkgs; [
@@ -89,20 +90,7 @@ in
 
   services.nginx = {
     enable = true;
-    config = ''
-    events {}
-    http {
-        server {
-        listen 80 default_server;
-        server_name "";
-
-        location / {
-            root /var/www/blog;
-            index index.html;
-        }
-      }
-    }
-    '';
+    config = builtins.readFile /etc/nixos/nginx/nginx.conf;
   };
 
   # services.cron = {
@@ -120,24 +108,36 @@ in
   services.jellyfin = {
     enable = true;
     openFirewall = true;
-    user="manan";
+    user = "manan";
   };
 
-  # systemd.services.flood = {
-  #   enable = true;
-  #   after = [ "network.target" ];
-  #   wantedBy = [ "multi-user.target" ];
-  #   description = "Flood service for %I";
-  #   serviceConfig = {
-  #       Type = "simple";
-  #       KillMode = "process";
-  #       ExecStart = "${pkgs.flood}/bin/flood --host=0.0.0.0 --port=8097";
-  #       Restart = "on-failure";
-  #       RestartSec = "3";
-  #   };
-  # };
+  systemd.services.clippy = {
+    enable = true;
+    after = [ "network.target" ];
+    wantedBy = [ "multi-user.target" ];
+    description = "clippy service for %I";
+    serviceConfig = {
+        Type = "simple";
+        KillMode = "process";
+        ExecStart = "/home/manan/bin/clippy --port=8097 --base-url=/clippy";
+        Restart = "on-failure";
+        RestartSec = "3";
+    };
+  };
 
-  # services.transmission.enable = true;
+  systemd.services.pinggy = {
+    enable = true;
+    after = [ "network.target" ];
+    wantedBy = [ "multi-user.target" ];
+    description = "pinggy ssh tunnel";
+    serviceConfig = {
+        Type = "simple";
+        KillMode = "process";
+        ExecStart = "/run/current-system/sw/bin/ssh -p 443 -R0:localhost:80 -L0.0.0.0:4300:localhost:4300 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 ${pinggyToken}@a.pinggy.io";
+        Restart = "on-failure";
+        RestartSec = "10";
+    };
+  };
 
   services.deluge = {
     enable = true;
@@ -166,6 +166,7 @@ in
   nixpkgs.config.packageOverrides = pkgs: {
     vaapiIntel = pkgs.vaapiIntel.override { enableHybridCodec = true; };
   };
+
   hardware.graphics = {
     enable = true;
     extraPackages = with pkgs; [
